@@ -4,6 +4,7 @@ import shutil
 import re
 import datetime
 import binascii
+import logging
 from email.utils import parsedate_to_datetime
 from email.header import decode_header
 
@@ -48,6 +49,8 @@ def decode_email_header(header):
 
 def extract_email_parts(msg):
     """Extract relevant parts from an email message."""
+    logger = logging.getLogger(__name__)
+
     # Extract headers
     date_str = msg.get('Date')
     date = None
@@ -55,6 +58,7 @@ def extract_email_parts(msg):
         try:
             date = parsedate_to_datetime(date_str)
         except:
+            logger.warning(f"Failed to parse date: {date_str}")
             date = None
 
     from_addr = decode_email_header(msg.get('From', ''))
@@ -62,20 +66,26 @@ def extract_email_parts(msg):
     cc_addr = decode_email_header(msg.get('Cc', ''))
     subject = decode_email_header(msg.get('Subject', ''))
 
+    logger.debug(f"Extracting email: Subject='{subject}', From='{from_addr}'")
+
     # Extract body content and attachments
     body_text = ""
     attachments = []
+    part_count = 0
 
     for part in msg.walk():
+        part_count += 1
         content_type = part.get_content_type()
         content_disposition = part.get('Content-Disposition', '')
 
         # Handle text parts
         if content_type == 'text/plain' and 'attachment' not in content_disposition:
+            logger.debug(f"  Part {part_count}: Extracting plain text content")
             body_text += decode_content(part)
 
         # Handle HTML parts if no plain text is available
         elif content_type == 'text/html' and 'attachment' not in content_disposition and not body_text:
+            logger.debug(f"  Part {part_count}: Extracting HTML content (no plain text found)")
             # Basic HTML stripping (simple approach)
             html_content = decode_content(part)
             # Remove HTML tags (simple approach)
@@ -88,7 +98,10 @@ def extract_email_parts(msg):
                 filename = decode_email_header(filename)
                 attachment_content = part.get_payload(decode=True)
                 if attachment_content:
+                    logger.debug(f"  Part {part_count}: Found attachment '{filename}' ({len(attachment_content)} bytes)")
                     attachments.append((filename, attachment_content, content_type))
+
+    logger.info(f"Extracted email with {len(attachments)} attachment(s), body length: {len(body_text)} chars")
 
     return {
         'date': date,
@@ -108,7 +121,10 @@ def extract_thread_parts(body_text):
 
     Returns a list of dictionaries containing extracted metadata and content for each part.
     """
+    logger = logging.getLogger(__name__)
     thread_parts = []
+
+    logger.debug("Searching for email thread patterns in body text")
 
     # Common patterns that indicate the start of a quoted email in the thread
     patterns = [
@@ -124,6 +140,7 @@ def extract_thread_parts(body_text):
     for pattern in patterns:
         matches = list(re.finditer(pattern, body_text, re.IGNORECASE | re.DOTALL))
         if matches:
+            logger.debug(f"Found {len(matches)} thread part(s) using pattern")
             last_end = 0
             for match in matches:
                 # Extract metadata from the match
@@ -169,6 +186,11 @@ def extract_thread_parts(body_text):
             # If we've found and processed parts with this pattern, we can stop checking other patterns
             if thread_parts:
                 break
+
+    if thread_parts:
+        logger.info(f"Extracted {len(thread_parts)} email(s) from thread body")
+    else:
+        logger.debug("No thread patterns found in body text")
 
     return thread_parts
 
@@ -273,8 +295,12 @@ def deduplicate_emails(emails, threshold=8):
     Returns:
         List of unique emails
     """
+    logger = logging.getLogger(__name__)
+
     if not emails:
         return []
+
+    logger.info(f"Deduplicating {len(emails)} email(s) with threshold={threshold}")
 
     # Normalize dates for comparison (handle timezone-aware vs timezone-naive)
     for email in emails:
@@ -285,9 +311,11 @@ def deduplicate_emails(emails, threshold=8):
                 email['date'] = email['date'].astimezone(datetime.timezone.utc).replace(tzinfo=None)
 
     # Calculate hashes for all emails
+    logger.debug("Calculating SimHash fingerprints for all emails")
     email_hashes = [(email, email_feature_hash(email)) for email in emails]
 
     # Sort by date if available, to prioritize newer emails
+    logger.debug("Sorting emails by date (newest first)")
     email_hashes.sort(
         key=lambda x: x[0].get('date') if isinstance(x[0].get('date'), datetime.datetime) else datetime.datetime.min,
         reverse=True
@@ -295,8 +323,10 @@ def deduplicate_emails(emails, threshold=8):
 
     unique_emails = []
     used_indices = set()
+    duplicates_found = 0
 
     # Iterate through emails
+    logger.debug("Comparing emails for duplicates")
     for i, (email1, hash1) in enumerate(email_hashes):
         if i in used_indices:
             continue
@@ -311,9 +341,12 @@ def deduplicate_emails(emails, threshold=8):
                 # Calculate Hamming distance
                 distance = hamming_distance(hash1, hash2)
                 if distance <= threshold:
+                    duplicates_found += 1
+                    logger.debug(f"  Email {j} is duplicate of email {i} (distance={distance})")
                     used_indices.add(j)
 
     # Sort unique emails by date (already normalized)
+    logger.info(f"Deduplication complete: {len(unique_emails)} unique, {duplicates_found} duplicate(s) removed")
 
     return unique_emails
 
@@ -377,16 +410,22 @@ def process_eml_file(eml_file_path, newest_first=False):
         eml_file_path: Path to the EML file
         newest_first: If True, sorts emails from newest to oldest. Default is oldest to newest.
     """
+    logger = logging.getLogger(__name__)
+
     # Import here to avoid circular imports
     import dateutil.parser
 
-    # Create output directory name based on EML filename
     eml_basename = os.path.basename(eml_file_path)
+    logger.info(f"Processing: {eml_basename}")
+
+    # Create output directory name based on EML filename
     output_dir_name = os.path.splitext(eml_basename)[0]
     output_dir_path = os.path.join('output', output_dir_name)
     os.makedirs(output_dir_path, exist_ok=True)
+    logger.debug(f"Output directory: {output_dir_path}")
 
     # Parse the EML file
+    logger.debug(f"Parsing EML file: {eml_file_path}")
     with open(eml_file_path, 'rb') as file:
         msg = email.message_from_binary_file(file)
 
@@ -396,37 +435,51 @@ def process_eml_file(eml_file_path, newest_first=False):
     # First, try to extract embedded emails using the message/rfc822 method
     if msg.get_content_type() == 'multipart/mixed' and any(
             part.get_content_type() == 'message/rfc822' for part in msg.walk()):
+        logger.info("Detected multipart message with embedded RFC822 emails")
         # This is a thread with forwarded messages
         # Extract the main email
+        logger.debug("Extracting main email")
         main_email = extract_email_parts(msg)
         emails.append(main_email)
 
         # Extract embedded emails
+        logger.debug("Extracting embedded emails")
+        embedded_count = 0
         for part in msg.walk():
             if part.get_content_type() == 'message/rfc822':
                 embedded_msgs = part.get_payload()
                 if isinstance(embedded_msgs, list):
                     for embedded_msg in embedded_msgs:
+                        embedded_count += 1
+                        logger.debug(f"Extracting embedded email {embedded_count}")
                         emails.append(extract_email_parts(embedded_msg))
+        logger.info(f"Extracted {embedded_count} embedded email(s)")
     else:
+        logger.info("Processing as standard email (checking for thread patterns)")
         # Extract the main email parts
+        logger.debug("Extracting main email")
         main_email = extract_email_parts(msg)
         emails.append(main_email)
 
         # Try to extract additional emails from the body text using pattern matching
+        logger.debug("Searching for thread parts in body text")
         thread_parts = extract_thread_parts(main_email['body'])
 
         if thread_parts:
+            logger.info(f"Processing {len(thread_parts)} thread part(s)")
             # If thread parts were found, append them to the emails list
-            for part in thread_parts:
+            for idx, part in enumerate(thread_parts, 1):
+                logger.debug(f"Processing thread part {idx}/{len(thread_parts)}")
                 # Convert the date string to a datetime object if possible
                 date_obj = None
                 if part['date']:
                     try:
                         # Try common date formats
                         date_obj = dateutil.parser.parse(part['date'])
+                        logger.debug(f"  Parsed date: {date_obj}")
                     except:
                         # If parsing fails, keep the string
+                        logger.debug(f"  Could not parse date: {part['date']}")
                         date_obj = part['date']
 
                 # Create an email entry for each thread part
@@ -442,33 +495,71 @@ def process_eml_file(eml_file_path, newest_first=False):
                 emails.append(thread_email)
 
     # Deduplicate emails using SimHash
-    print(f"Found {len(emails)} emails before deduplication")
+    logger.info(f"Total emails found: {len(emails)}")
     unique_emails = deduplicate_emails(emails)
-    print(f"Reduced to {len(unique_emails)} unique emails after deduplication")
+
+    # Deduplicate attachment filenames before saving
+    logger.info("Deduplicating attachment filenames")
+    used_filenames = {}  # Maps sanitized filename -> count
+    for email_parts in unique_emails:
+        if email_parts.get('attachments'):
+            new_attachments = []
+            for attachment_name, attachment_content, content_type in email_parts['attachments']:
+                # Sanitize filename to avoid path issues
+                safe_filename = re.sub(r'[^\w\.-]', '_', attachment_name)
+
+                # Check if this filename has been used before
+                if safe_filename in used_filenames:
+                    # Generate a unique filename by inserting a counter before the extension
+                    base_name, ext = os.path.splitext(safe_filename)
+                    used_filenames[safe_filename] += 1
+                    unique_filename = f"{base_name}_{used_filenames[safe_filename]}{ext}"
+                    logger.debug(f"  Renamed duplicate '{safe_filename}' to '{unique_filename}'")
+                else:
+                    used_filenames[safe_filename] = 0
+                    unique_filename = safe_filename
+
+                # Update the attachment tuple with the unique filename
+                new_attachments.append((unique_filename, attachment_content, content_type))
+
+            email_parts['attachments'] = new_attachments
 
     # Create markdown content (no need to normalize dates again, they're already normalized)
+    sort_order = "newest to oldest" if newest_first else "oldest to newest"
+    logger.info(f"Creating markdown content (sorted {sort_order})")
     markdown_content = create_markdown_content(unique_emails, newest_first)
 
     # Save markdown file
     md_file_path = os.path.join(output_dir_path, f"{output_dir_name}.md")
+    logger.info(f"Writing markdown file: {md_file_path}")
     with open(md_file_path, 'w', encoding='utf-8') as md_file:
         md_file.write(markdown_content)
+    logger.debug(f"Markdown file written ({len(markdown_content)} bytes)")
 
     # Save attachments
-    for email_parts in emails:
-        for attachment_name, attachment_content, _ in email_parts.get('attachments', []):
-            # Sanitize filename to avoid path issues
-            safe_filename = re.sub(r'[^\w\.-]', '_', attachment_name)
-            attachment_path = os.path.join(output_dir_path, safe_filename)
+    total_attachments = sum(len(email_parts.get('attachments', [])) for email_parts in unique_emails)
+    if total_attachments > 0:
+        logger.info(f"Saving {total_attachments} attachment(s)")
+        attachment_count = 0
+        for email_parts in unique_emails:
+            for attachment_name, attachment_content, _ in email_parts.get('attachments', []):
+                attachment_count += 1
+                attachment_path = os.path.join(output_dir_path, attachment_name)
+                logger.debug(f"  [{attachment_count}/{total_attachments}] Saving: {attachment_name} ({len(attachment_content)} bytes)")
 
-            with open(attachment_path, 'wb') as attachment_file:
-                attachment_file.write(attachment_content)
+                with open(attachment_path, 'wb') as attachment_file:
+                    attachment_file.write(attachment_content)
+    else:
+        logger.debug("No attachments to save")
 
     # Move processed EML file to 'done' directory
     done_dir = 'done'
     os.makedirs(done_dir, exist_ok=True)
-    shutil.move(eml_file_path, os.path.join(done_dir, eml_basename))
+    done_path = os.path.join(done_dir, eml_basename)
+    logger.info(f"Moving processed file to: {done_path}")
+    shutil.move(eml_file_path, done_path)
 
+    logger.info(f"Successfully processed: {eml_basename}")
     return md_file_path
 
 
@@ -482,31 +573,79 @@ def main():
                         help='Sort emails from newest to oldest (default: oldest to newest)')
     parser.add_argument('--dedup-threshold', type=int, default=8,
                         help='Hamming distance threshold for deduplication (default: 8)')
+    parser.add_argument('--verbose', '-v', action='store_true',
+                        help='Enable verbose debug logging')
+    parser.add_argument('--quiet', '-q', action='store_true',
+                        help='Only show warnings and errors')
     args = parser.parse_args()
 
+    # Configure logging
+    log_level = logging.INFO
+    if args.verbose:
+        log_level = logging.DEBUG
+    elif args.quiet:
+        log_level = logging.WARNING
+
+    logging.basicConfig(
+        level=log_level,
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+
+    logger = logging.getLogger(__name__)
+    logger.info("Starting EML to Markdown converter")
+    logger.info(f"Settings: newest_first={args.newest_first}, dedup_threshold={args.dedup_threshold}")
+
     # Create required directories if they don't exist
+    logger.debug("Creating required directories")
     for directory in ['input', 'output', 'done']:
         os.makedirs(directory, exist_ok=True)
 
     # Process all EML files in the input directory
     input_dir = 'input'
     processed_files = []
+    failed_files = []
 
-    for filename in os.listdir(input_dir):
-        if filename.lower().endswith('.eml'):
-            eml_file_path = os.path.join(input_dir, filename)
-            try:
-                md_file_path = process_eml_file(eml_file_path, args.newest_first)
-                processed_files.append((filename, md_file_path))
-                print(f"Processed: {filename} -> {md_file_path}")
-            except Exception as e:
-                print(f"Error processing {filename}: {str(e)}")
+    # Count total files first
+    eml_files = [f for f in os.listdir(input_dir) if f.lower().endswith('.eml')]
+    total_files = len(eml_files)
+
+    if total_files == 0:
+        logger.warning(f"No EML files found in '{input_dir}' directory")
+        return
+
+    logger.info(f"Found {total_files} EML file(s) to process")
+    logger.info("=" * 60)
+
+    for idx, filename in enumerate(eml_files, 1):
+        logger.info(f"[{idx}/{total_files}] Starting: {filename}")
+        eml_file_path = os.path.join(input_dir, filename)
+        try:
+            md_file_path = process_eml_file(eml_file_path, args.newest_first)
+            processed_files.append((filename, md_file_path))
+            logger.info(f"[{idx}/{total_files}] Success: {filename}")
+        except Exception as e:
+            logger.error(f"[{idx}/{total_files}] Failed: {filename} - {str(e)}", exc_info=args.verbose)
+            failed_files.append((filename, str(e)))
+        logger.info("-" * 60)
 
     # Print summary
-    print("\nConversion Summary:")
-    print(f"Total files processed: {len(processed_files)}")
-    for original, converted in processed_files:
-        print(f"  {original} -> {converted}")
+    logger.info("=" * 60)
+    logger.info("CONVERSION SUMMARY")
+    logger.info("=" * 60)
+    logger.info(f"Total files found: {total_files}")
+    logger.info(f"Successfully processed: {len(processed_files)}")
+    logger.info(f"Failed: {len(failed_files)}")
+
+    if processed_files:
+        logger.info("\nSuccessfully converted:")
+        for original, converted in processed_files:
+            logger.info(f"  {original} -> {converted}")
+
+    if failed_files:
+        logger.warning("\nFailed to convert:")
+        for filename, error in failed_files:
+            logger.warning(f"  {filename}: {error}")
 
 
 if __name__ == "__main__":

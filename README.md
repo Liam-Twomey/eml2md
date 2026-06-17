@@ -107,20 +107,41 @@ This is the content of the email.
 
 ## Requirements
 
-- Python 3.10+
-- email-validator
-- python-dateutil
+- Python >= 3.10
+- email-validator >= 2.0.0
+- python-dateutil >= 2.8.2
 
-## Project Components
+## Project Layout 
 
+```
+.
+├── pyproject.toml  # Dependencies and packaging information
+├── README.md       # Project information and instructions
+└── src             # Source code directory
+    ├── eml2md.py   # The processing code
+    └── __init__.py # Version information and initialization info
+```
 
 ## Limitations
 
 - The tool is designed for English-language emails
 - Complex HTML formatting may be simplified in the conversion process
-- Pattern matching depends on email client formatting and may not detect all thread styles
+- Pattern matching depends on email client formatting and may not detect all
+  thread styles
 - Deduplication thresholds may need adjustment for your specific emails
-- Very short emails might be incorrectly identified as duplicates (adjust threshold if needed)
+- Very short emails might be incorrectly identified as duplicates (adjust
+  threshold if needed)
+
+## Differences from the parent repo
+
+- Switched path parsing from `os.path` to `pathlib.Path`
+- Switched input mechanism to be entirely CLI-based and operating in current
+  directory, rather than needing files to be copied into the project directory
+- Simplified filename parsing and file loading
+- Set up for use with package managers by:
+    - Reorganizing file structure
+    - Creating `pyproject.toml` to replace `requirements.txt`
+    - Defining script behavior
 
 ## License
 

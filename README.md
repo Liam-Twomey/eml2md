@@ -1,6 +1,8 @@
 # EML to Markdown Converter
 
-This tool converts email files (`.eml`) to Markdown format (`.md`) while preserving the email thread structure, extracting attachments, and intelligently removing duplicate emails in threads.
+This tool converts email files (`.eml`) to Markdown format (`.md`) while
+preserving the email thread structure, extracting attachments, and intelligently
+removing duplicate emails in threads.
 
 ## Features
 
@@ -15,7 +17,9 @@ This tool converts email files (`.eml`) to Markdown format (`.md`) while preserv
 
 ## Installation
 
-__Prerequisites:__ Install Python 3.10+ and [uv](https://docs.astral.sh/uv/getting-started/installation/) (preferred) or [pipx](https://pipx.pypa.io/stable/how-to/install-pipx/)
+__Prerequisites:__ Install Python 3.10+ and [uv](https://docs.astral.sh/uv/
+getting-started/installation/) (preferred) or [pipx](https://pipx.pypa.io/
+stable/how-to/install-pipx/)
 
 ```shell
 # preferred
@@ -28,7 +32,8 @@ pipx install git+https://github.com/Liam-Twomey/eml2md
 
 `eml2md [args] emailfile.eml emailfile2.eml`
 
-This will create new folders `emailfile` and `emailfile2` in the parent directory of the `.eml` files, containing the markdown files and attachments.
+This will create new folders `emailfile` and `emailfile2` in the parent
+directory of the `.eml` files, containing the markdown files and attachments.
 
 
 ### Command Line Options
@@ -44,14 +49,17 @@ This will create new folders `emailfile` and `emailfile2` in the parent director
 
 The tool uses three complementary methods to handle email threads:
 
-1. **Embedded Messages**: Detects properly formatted `message/rfc822` parts in multipart emails.
+1. **Embedded Messages**: Detects properly formatted `message/rfc822` parts in
+   multipart emails.
 
-2. **Pattern Matching**: Analyzes the email body text to find patterns indicating quoted emails such as:
+2. **Pattern Matching**: Analyzes the email body text to find patterns
+   indicating quoted emails such as:
    - Outlook format: "From: ... Sent: ... To: ... Subject: ..."
    - Reply format: "On [date], [person] wrote:"
    - Gmail format: "On [date] at [time], [person] wrote:"
 
-3. **SimHash Deduplication**: Uses content-based hashing to identify and remove duplicate emails, even when formatting differs:
+3. **SimHash Deduplication**: Uses content-based hashing to identify and remove
+   duplicate emails, even when formatting differs:
    - Creates a fingerprint for each email that preserves similarity
    - Compares emails using Hamming distance between fingerprints
    - Removes duplicates while prioritizing newer emails
@@ -64,7 +72,9 @@ The SimHash algorithm:
 3. Compares fingerprints using Hamming distance (bit differences)
 4. Groups similar emails and keeps only the most representative one
 
-The default threshold of 8 bits (out of 64) works well for most emails, but you can adjust it with the `--dedup-threshold` parameter. Higher values will be more aggressive in identifying duplicates.
+The default threshold of 8 bits (out of 64) works well for most emails, but you
+can adjust it with the `--dedup-threshold` parameter. Higher values will be
+more aggressive in identifying duplicates.
 
 ## Output Format
 
@@ -145,4 +155,4 @@ This is the content of the email.
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details
+This project is licensed under the MIT License (refer to `LICENSE.txt`)

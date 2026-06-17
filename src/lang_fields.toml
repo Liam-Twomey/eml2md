@@ -1,0 +1,28 @@
+[languages]
+en = {
+	date=	'Date'
+	from=	'From'
+	to=	'To'
+	cc=	'Cc'
+	subject='Subject'
+}
+
+de = {
+	date=	'Gesendet'
+	from=	'Von'
+	to=	'An'
+	cc=	'Cc'
+	subject='Betreff'
+}
+[format]
+# Regexes for 
+quoted = [
+	# Common Outlook Format
+        'From:[\s]*(.*?)[\r\n]+Sent:[\s]*(.*?)[\r\n]+To:[\s]*(.*?)(?:[\r\n]+Cc:[\s]*(.*?))?[\r\n]+Subject:[\s]*(.*?)[\r\n]+',
+        # Alternative format sometimes seen
+        'On[\s]*(.*?),[\s]*(.*?)[\s]+wrote:[\r\n]+',
+        # Gmail-style format
+        'On[\s]*(.*?)[\s]+at[\s]+(.*?),[\s]*(.*?)[\s]+wrote:[\r\n]+'
+	# If not treated as a thread
+	'-*\r\n+(?=\*)'
+]

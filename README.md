@@ -129,6 +129,7 @@ This is the content of the email.
 ├── README.md       # Project information and instructions
 └── src             # Source code directory
     ├── eml2md.py   # The processing code
+    ├── fmt_par.toml# File contaning formatting information (not currently used)
     └── __init__.py # Version information and initialization info
 ```
 

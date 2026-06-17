@@ -52,21 +52,29 @@ def decode_email_header(header):
 def extract_email_parts(msg):
     """Extract relevant parts from an email message."""
     logger = logging.getLogger(__name__)
-
-    # Extract headers
-    date_str = msg.get('Date')
     date = None
+    # Extract headers
+    try: 
+        # english
+        date_str = msg.get('Date')
+        from_addr = decode_email_header(msg.get('From', ''))
+        to_addr = decode_email_header(msg.get('To', ''))
+        cc_addr = decode_email_header(msg.get('Cc', ''))
+        subject = decode_email_header(msg.get('Subject', ''))
+    except: 
+        # german
+        date_str = msg.get('Gesendet')
+        from_addr = decode_email_header(msg.get('Von', ''))
+        to_addr = decode_email_header(msg.get('An', ''))
+        cc_addr = decode_email_header(msg.get('Cc', ''))
+        subject = decode_email_header(msg.get('Betreff', ''))
+
     if date_str:
         try:
             date = parsedate_to_datetime(date_str)
         except:
             logger.warning(f"Failed to parse date: {date_str}")
             date = None
-
-    from_addr = decode_email_header(msg.get('From', ''))
-    to_addr = decode_email_header(msg.get('To', ''))
-    cc_addr = decode_email_header(msg.get('Cc', ''))
-    subject = decode_email_header(msg.get('Subject', ''))
 
     logger.debug(f"Extracting email: Subject='{subject}', From='{from_addr}'")
 
@@ -136,6 +144,8 @@ def extract_thread_parts(body_text):
         r'On[\s]*(.*?),[\s]*(.*?)[\s]+wrote:[\r\n]+',
         # Gmail-style format
         r'On[\s]*(.*?)[\s]+at[\s]+(.*?),[\s]*(.*?)[\s]+wrote:[\r\n]+'
+        # If not quote-replied:
+        r'-*\r\n+(?=\*)'
     ]
 
     # Find all occurrences of email headers in the body text

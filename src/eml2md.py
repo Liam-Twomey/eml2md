@@ -1,6 +1,7 @@
 import os
 import email
 import shutil
+import argparse
 import re
 import datetime
 import binascii
@@ -565,7 +566,7 @@ def process_eml_file(eml_file_path, newest_first=False):
 
 def main():
     """Main function to process all EML files in the input directory."""
-    import argparse
+    
 
     # Set up command line arguments
     parser = argparse.ArgumentParser(description='Convert EML files to Markdown format')
@@ -577,6 +578,8 @@ def main():
                         help='Enable verbose debug logging')
     parser.add_argument('--quiet', '-q', action='store_true',
                         help='Only show warnings and errors')
+    parser.add_argument('filepath',nargs="?",
+                        help="Path to the .eml file")
     args = parser.parse_args()
 
     # Configure logging
@@ -646,7 +649,6 @@ def main():
         logger.warning("\nFailed to convert:")
         for filename, error in failed_files:
             logger.warning(f"  {filename}: {error}")
-
 
 if __name__ == "__main__":
     main()

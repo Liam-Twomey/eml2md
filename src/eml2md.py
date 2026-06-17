@@ -578,8 +578,8 @@ def main():
                         help='Enable verbose debug logging')
     parser.add_argument('--quiet', '-q', action='store_true',
                         help='Only show warnings and errors')
-    parser.add_argument('filepath',nargs="?",
-                        help="Path to the .eml file")
+    parser.add_argument('filepaths',nargs="?",
+                        help="Path to the .eml file(s)")
     args = parser.parse_args()
 
     # Configure logging
@@ -601,23 +601,24 @@ def main():
 
     # Create required directories if they don't exist
     logger.debug("Creating required directories")
-    for directory in ['input', 'output', 'done']:
-        os.makedirs(directory, exist_ok=True)
+    #for directory in ['input', 'output', 'done']:
+    #    os.makedirs(directory, exist_ok=True)
 
     # Process all EML files in the input directory
-    input_dir = 'input'
-    processed_files = []
-    failed_files = []
+    #input_dir = 'input'
+    #processed_files = []
+    #failed_files = []
 
     # Count total files first
-    eml_files = [f for f in os.listdir(input_dir) if f.lower().endswith('.eml')]
+    eml_files = [f for f in args.filepaths if f.lower().endswith('.eml')]
     total_files = len(eml_files)
 
     if total_files == 0:
-        logger.warning(f"No EML files found in '{input_dir}' directory")
+        #logger.warning(f"No EML files found in '{input_dir}' directory")
+        logger.warning(f"No EML files supplied.")
         return
 
-    logger.info(f"Found {total_files} EML file(s) to process")
+    logger.info(f"Processing {total_files} .eml files")
     logger.info("=" * 60)
 
     for idx, filename in enumerate(eml_files, 1):

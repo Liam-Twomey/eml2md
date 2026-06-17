@@ -1,4 +1,5 @@
-import os
+#import os
+from pathlib import Path
 import email
 import shutil
 import argparse
@@ -415,15 +416,13 @@ def process_eml_file(eml_file_path, newest_first=False):
 
     # Import here to avoid circular imports
     import dateutil.parser
-
-    eml_basename = os.path.basename(eml_file_path)
-    logger.info(f"Processing: {eml_basename}")
+    
+    output_dir = eml_file_path.parent/f'{eml_file_path.stem}-md'
+    logger.info(f"Processing: {eml_file_path.name}")
 
     # Create output directory name based on EML filename
-    output_dir_name = os.path.splitext(eml_basename)[0]
-    output_dir_path = os.path.join('output', output_dir_name)
-    os.makedirs(output_dir_path, exist_ok=True)
-    logger.debug(f"Output directory: {output_dir_path}")
+    output_dir.mkdir(exist_ok=True)
+    logger.debug(f"Output directory: {output_dir}")
 
     # Parse the EML file
     logger.debug(f"Parsing EML file: {eml_file_path}")
@@ -507,14 +506,13 @@ def process_eml_file(eml_file_path, newest_first=False):
             new_attachments = []
             for attachment_name, attachment_content, content_type in email_parts['attachments']:
                 # Sanitize filename to avoid path issues
-                safe_filename = re.sub(r'[^\w\.-]', '_', attachment_name)
+                safe_filename = Path(re.sub(r'[^\w\.-]', '_', attachment_name))
 
                 # Check if this filename has been used before
                 if safe_filename in used_filenames:
                     # Generate a unique filename by inserting a counter before the extension
-                    base_name, ext = os.path.splitext(safe_filename)
                     used_filenames[safe_filename] += 1
-                    unique_filename = f"{base_name}_{used_filenames[safe_filename]}{ext}"
+                    unique_filename = f"{safe_filename.stem}_{used_filenames[safe_filename]}{safe_filename.suffix}"
                     logger.debug(f"  Renamed duplicate '{safe_filename}' to '{unique_filename}'")
                 else:
                     used_filenames[safe_filename] = 0
@@ -531,7 +529,7 @@ def process_eml_file(eml_file_path, newest_first=False):
     markdown_content = create_markdown_content(unique_emails, newest_first)
 
     # Save markdown file
-    md_file_path = os.path.join(output_dir_path, f"{output_dir_name}.md")
+    md_file_path = output_dir/eml_file_path.with_suffix('.md')
     logger.info(f"Writing markdown file: {md_file_path}")
     with open(md_file_path, 'w', encoding='utf-8') as md_file:
         md_file.write(markdown_content)
@@ -545,7 +543,7 @@ def process_eml_file(eml_file_path, newest_first=False):
         for email_parts in unique_emails:
             for attachment_name, attachment_content, _ in email_parts.get('attachments', []):
                 attachment_count += 1
-                attachment_path = os.path.join(output_dir_path, attachment_name)
+                attachment_path = output_dir/attachment_name
                 logger.debug(f"  [{attachment_count}/{total_attachments}] Saving: {attachment_name} ({len(attachment_content)} bytes)")
 
                 with open(attachment_path, 'wb') as attachment_file:
@@ -553,32 +551,24 @@ def process_eml_file(eml_file_path, newest_first=False):
     else:
         logger.debug("No attachments to save")
 
-    # Move processed EML file to 'done' directory
-    done_dir = 'done'
-    os.makedirs(done_dir, exist_ok=True)
-    done_path = os.path.join(done_dir, eml_basename)
-    logger.info(f"Moving processed file to: {done_path}")
-    shutil.move(eml_file_path, done_path)
-
-    logger.info(f"Successfully processed: {eml_basename}")
+    logger.info(f"Successfully processed: {eml_file_path.name}")
     return md_file_path
 
 
 def main():
     """Main function to process all EML files in the input directory."""
     
-
     # Set up command line arguments
     parser = argparse.ArgumentParser(description='Convert EML files to Markdown format')
-    parser.add_argument('--newest-first', action='store_true',
+    parser.add_argument('--newest-first','-n', action='store_true',
                         help='Sort emails from newest to oldest (default: oldest to newest)')
-    parser.add_argument('--dedup-threshold', type=int, default=8,
+    parser.add_argument('--dedup-threshold','-t', type=int, default=8,
                         help='Hamming distance threshold for deduplication (default: 8)')
     parser.add_argument('--verbose', '-v', action='store_true',
                         help='Enable verbose debug logging')
     parser.add_argument('--quiet', '-q', action='store_true',
                         help='Only show warnings and errors')
-    parser.add_argument('filepaths',nargs="?",
+    parser.add_argument('filepaths',nargs="*",
                         help="Path to the .eml file(s)")
     args = parser.parse_args()
 
@@ -597,24 +587,21 @@ def main():
 
     logger = logging.getLogger(__name__)
     logger.info("Starting EML to Markdown converter")
-    logger.info(f"Settings: newest_first={args.newest_first}, dedup_threshold={args.dedup_threshold}")
+    logger.info(f"Settings: newest_first={args.newest_first}, dedup_threshold={args.dedup_threshold}, filepaths={args.filepaths}")
 
     # Create required directories if they don't exist
     logger.debug("Creating required directories")
-    #for directory in ['input', 'output', 'done']:
-    #    os.makedirs(directory, exist_ok=True)
+    fpaths = [Path(f) for f in args.filepaths]
 
     # Process all EML files in the input directory
-    #input_dir = 'input'
-    #processed_files = []
-    #failed_files = []
+    processed_files = []
+    failed_files = []
 
     # Count total files first
-    eml_files = [f for f in args.filepaths if f.lower().endswith('.eml')]
+    eml_files = [f for f in fpaths if f.suffix == '.eml']
     total_files = len(eml_files)
 
     if total_files == 0:
-        #logger.warning(f"No EML files found in '{input_dir}' directory")
         logger.warning(f"No EML files supplied.")
         return
 
@@ -623,9 +610,8 @@ def main():
 
     for idx, filename in enumerate(eml_files, 1):
         logger.info(f"[{idx}/{total_files}] Starting: {filename}")
-        eml_file_path = os.path.join(input_dir, filename)
         try:
-            md_file_path = process_eml_file(eml_file_path, args.newest_first)
+            md_file_path = process_eml_file(filename, args.newest_first)
             processed_files.append((filename, md_file_path))
             logger.info(f"[{idx}/{total_files}] Success: {filename}")
         except Exception as e:

@@ -14,7 +14,7 @@ classifiers = [
 	"Programming Language :: Python :: 3",
 ]
 dependencies = [
-	'email-validator >= 2.0.0'
+	'email-validator >= 2.0.0',
 	'python-dateutil >= 2.8.2'
 ]
 

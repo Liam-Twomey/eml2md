@@ -417,7 +417,7 @@ def process_eml_file(eml_file_path, newest_first=False):
     # Import here to avoid circular imports
     import dateutil.parser
     
-    output_dir = eml_file_path.parent/f'{eml_file_path.stem}-md'
+    output_dir = eml_file_path.parent/eml_file_path.stem
     logger.info(f"Processing: {eml_file_path.name}")
 
     # Create output directory name based on EML filename

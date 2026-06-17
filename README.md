@@ -11,63 +11,34 @@ This tool converts email files (`.eml`) to Markdown format (`.md`) while preserv
   - SimHash-based deduplication to remove redundant email content
 - Extracts and saves attachments
 - Organizes content in chronological order (oldest-to-newest or newest-to-oldest)
-- Moves processed files to a separate directory
-- Creates a clean directory structure for output files
-
-## Directory Structure
-
-```
-project/
-├── input/         # Place .eml files here
-├── output/        # Converted files will be saved here (one directory per email)
-│   └── email1/    # Example output directory
-│       ├── email1.md
-│       └── [attachments]
-├── done/          # Processed .eml files are moved here
-├── .gitignore     # Configured to ignore email content
-└── create_gitkeep.py  # Utility script to set up directory structure
-```
+- Provides a CLI interface to convert files in-place.
 
 ## Installation
 
-1. Make sure you have Python 3.7+ installed
-2. Clone this repository or download the source code
-3. Install the required dependencies:
+__Prerequisites:__ Install Python 3.10+ and [uv](https://docs.astral.sh/uv/getting-started/installation/) (preferred) or [pipx](https://pipx.pypa.io/stable/how-to/install-pipx/)
 
-```bash
-pip install -r requirements.txt
-```
-
-4. Set up the required directory structure:
-
-```bash
-python create_gitkeep.py
+```shell
+# preferred
+uv tool install git+https://github.com/Liam-Twomey/eml2md
+# alternate
+pipx install git+https://github.com/Liam-Twomey/eml2md
 ```
 
 ## Usage
 
-1. Place your `.eml` files in the `input` directory
-2. Run the script:
+`eml2md [args] emailfile.eml emailfile2.eml`
 
-```bash
-# Default: oldest to newest email order, default deduplication
-python eml2md.py
+This will create new folders `emailfile` and `emailfile2` in the parent directory of the `.eml` files, containing the markdown files and attachments.
 
-# Optional: newest to oldest email order
-python eml2md.py --newest-first
-
-# Adjust deduplication sensitivity (higher = more aggressive)
-python eml2md.py --dedup-threshold 12
-```
-
-3. Find your converted files in the `output` directory, organized in subdirectories named after the original email files
 
 ### Command Line Options
 
-| Option | Description |
-|--------|-------------|
-| `--newest-first` | Sort emails from newest to oldest in the markdown file (default is oldest to newest) |
-| `--dedup-threshold VALUE` | Set the similarity threshold for deduplication (default is 8, higher values mean more aggressive deduplication) |
+| Option | Shortcut | Description |
+|--------|----------|-------------|
+| `--newest-first` | `-n` | Sort emails from newest to oldest in the markdown file (default is oldest to newest) |
+| `--dedup-threshold VALUE` | `-t VALUE` | Set the similarity threshold for deduplication (default is 8, higher values mean more aggressive deduplication) |
+| `--verbose` | `-v` | Print all available info messages. |
+| `--quiet`   | `-q` | Print only warnings and errors. |
 
 ## Thread Detection and Deduplication
 
@@ -136,24 +107,12 @@ This is the content of the email.
 
 ## Requirements
 
-- Python 3.7+
+- Python 3.10+
 - email-validator
 - python-dateutil
 
 ## Project Components
 
-### Main Script
-
-- `eml2md.py` - The main script that handles the conversion process
-
-### Utility Scripts
-
-- `create_gitkeep.py` - Sets up the required directory structure and creates .gitkeep files to ensure the directories are tracked by Git while ignoring their contents. Run this script once when setting up the project.
-
-### Configuration Files
-
-- `.gitignore` - Configured to track the directory structure but ignore email files and content
-- `requirements.txt` - Lists the Python package dependencies
 
 ## Limitations
 
